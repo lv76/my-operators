@@ -90,11 +90,43 @@ row 1 sum = 1.000000
 row 7 sum = 1.000000
 ```
 
+
 ## Limitations & Future Work
 
 - Currently supports `float32` only (FP16 / BF16 support planned)
 - Block size fixed at 256 threads (auto-tuning planned)
 - `d_model` must be a multiple of 4 for full vectorization benefit
+
+## Benchmark
+
+Test environment: RTX 5070 Ti Laptop GPU, CUDA 13.1, PyTorch 2.11.0
+
+| seq_len | d_model | PyTorch (ms) | Custom (ms) | Speedup |
+|---------|---------|--------------|-------------|---------|
+| 128     | 1024    | 0.0078       | 0.0077      | 1.01x   |
+| 512     | 1024    | 0.0095       | 0.0100      | 0.95x   |
+| 1024    | 1024    | 0.0112       | 0.0107      | 1.05x   |
+| 2048    | 1024    | 0.0126       | 0.0192      | 0.66x   |
+| 128     | 4096    | 0.0112       | 0.0097      | 1.15x   |
+| 512     | 4096    | 0.0265       | 0.0147      | 1.81x   |
+| 1024    | 4096    | 0.0468       | 0.0276      | 1.70x   |
+
+**Key observation:** The kernel shows significant advantage at larger `d_model` (up to **1.81x** speedup at d_model=4096), where float4 vectorized memory access fully utilizes DRAM bandwidth. At small sizes, kernel launch overhead dominates.
+
+## Nsight Compute Analysis
+
+Profiled on input shape `4096 × 4096`:
+
+| Metric | Value |
+|--------|-------|
+| DRAM Throughput | 86.84% (295 GB/s) |
+| Memory Throughput | 86.84% |
+| Compute Throughput | 38.50% |
+| Achieved Occupancy | 96.69% |
+| Branch Efficiency | 100% |
+
+**Conclusion:** The kernel is **Memory Bound**, which is expected for softmax — the operation has low arithmetic intensity. The 86.84% DRAM utilization confirms that float4 vectorized loads are effective. Branch efficiency of 100% indicates zero warp divergence.
+    
 
 ## References
 

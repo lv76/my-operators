@@ -100,8 +100,8 @@ __global__ void online_softmax(
 
 
 int main() {
-    int seq_len = 8;
-    int d_model = 1024;
+    int seq_len = 4096;
+    int d_model = 4096;
     int total = seq_len * d_model;
 
     // Host 内存
